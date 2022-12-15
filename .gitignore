@@ -12,3 +12,4 @@ pids
 logs
 results
 build
+.env
