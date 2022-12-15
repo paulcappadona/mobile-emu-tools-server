@@ -8,11 +8,13 @@ const child_process_1 = __importDefault(require("child_process"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const app = (0, express_1.default)();
 app.use(express_1.default.json());
-const port = 3000;
-const adbCommand = "adb exec-out screencap -p > {path}";
 dotenv_1.default.config({ path: ".env" });
+const port = process.env.LISTEN_PORT;
+const adbCommand = "adb exec-out screencap -p > {path}";
+const iosPermsCommand = "applesimutils --booted --bundle io.sportshub.app.local --setPermissions \"{perms}\"";
 ;
-app.post('/', (req, res) => {
+;
+app.post('/android/screenshot', (req, res) => {
     try {
         const ssRequest = req.body;
         console.log(`Requested screenshot to ${ssRequest.path}`);
@@ -25,6 +27,18 @@ app.post('/', (req, res) => {
         res.status(500).send(`Error: ${e}`);
     }
 });
+app.post('/ios/permissions', (req, res) => {
+    try {
+        const requestData = req.body;
+        console.log(`Requested ios perms ${requestData.perms} to be set`);
+        child_process_1.default.execSync(iosPermsCommand.replace("{perms}", `${requestData.perms}`));
+        res.send();
+    }
+    catch (e) {
+        console.error(e);
+        res.status(500).send(`Error: ${e}`);
+    }
+});
 app.listen(port, () => {
-    console.log(`ADB server listening on port ${port}`);
+    console.log(`mobile emulator tools server listening on port ${port}`);
 });
