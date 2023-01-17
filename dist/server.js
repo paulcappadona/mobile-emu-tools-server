@@ -12,6 +12,7 @@ dotenv_1.default.config({ path: ".env" });
 const port = process.env.LISTEN_PORT;
 const adbCommand = "adb exec-out screencap -p > {path}";
 const iosPermsCommand = "applesimutils --booted --bundle {bundleId} --setPermissions \"{perms}\"";
+const adbLocationSetCommand = 'adb emu geo fix {lng} {lat}';
 const iosLocationSetCommand = 'applesimutils --booted -sl "[{lat}, {lng}]"';
 ;
 ;
@@ -48,6 +49,20 @@ app.post('/ios/location', (req, res) => {
         const requestData = req.body;
         console.log(`Requested ios location [lat, lng] : [${requestData.lat}, ${requestData.lng}]`);
         child_process_1.default.execSync(iosLocationSetCommand
+            .replace("{lat}", `${requestData.lat}`)
+            .replace("{lng}", `${requestData.lng}`));
+        res.send();
+    }
+    catch (e) {
+        console.error(e);
+        res.status(500).send(`Error: ${e}`);
+    }
+});
+app.post('/android/location', (req, res) => {
+    try {
+        const requestData = req.body;
+        console.log(`Requested ios location [lat, lng] : [${requestData.lat}, ${requestData.lng}]`);
+        child_process_1.default.execSync(adbLocationSetCommand
             .replace("{lat}", `${requestData.lat}`)
             .replace("{lng}", `${requestData.lng}`));
         res.send();
