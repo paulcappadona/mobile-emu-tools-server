@@ -11,7 +11,9 @@ app.use(express_1.default.json());
 dotenv_1.default.config({ path: ".env" });
 const port = process.env.LISTEN_PORT;
 const adbCommand = "adb exec-out screencap -p > {path}";
-const iosPermsCommand = "applesimutils --booted --bundle io.sportshub.app.local --setPermissions \"{perms}\"";
+const iosPermsCommand = "applesimutils --booted --bundle {bundleId} --setPermissions \"{perms}\"";
+const iosLocationSetCommand = 'applesimutils --booted -sl "[{lat}, {lng}]"';
+;
 ;
 ;
 app.post('/android/screenshot', (req, res) => {
@@ -31,7 +33,23 @@ app.post('/ios/permissions', (req, res) => {
     try {
         const requestData = req.body;
         console.log(`Requested ios perms ${requestData.perms} to be set`);
-        child_process_1.default.execSync(iosPermsCommand.replace("{perms}", `${requestData.perms}`));
+        child_process_1.default.execSync(iosPermsCommand
+            .replace("{perms}", `${requestData.perms}`)
+            .replace("{bundleId}", `${requestData.bundleId}`));
+        res.send();
+    }
+    catch (e) {
+        console.error(e);
+        res.status(500).send(`Error: ${e}`);
+    }
+});
+app.post('/ios/location', (req, res) => {
+    try {
+        const requestData = req.body;
+        console.log(`Requested ios location [lat, lng] : [${requestData.lat}, ${requestData.lng}]`);
+        child_process_1.default.execSync(iosLocationSetCommand
+            .replace("{lat}", `${requestData.lat}`)
+            .replace("{lng}", `${requestData.lng}`));
         res.send();
     }
     catch (e) {
