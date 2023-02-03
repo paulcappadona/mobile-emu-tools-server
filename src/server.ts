@@ -30,7 +30,7 @@ interface GpsPosition {
 app.post('/android/screenshot', (req: express.Request, res: express.Response) => {
   try {
     const ssRequest: Screenshot = req.body;
-    console.log(`Requested screenshot to ${ssRequest.path}`);
+    console.log(`Requested android screenshot to ${ssRequest.path}`);
     const screenshotBasePath = process.env.SCREENSHOT_BASE_PATH;
     child_process.execSync(adbCommand.replace("{path}", `${screenshotBasePath}/${ssRequest.path}`));
     res.send();
@@ -73,7 +73,7 @@ app.post('/ios/location', (req: express.Request, res: express.Response) => {
 app.post('/android/location', (req: express.Request, res: express.Response) => {
   try {
     const requestData: GpsPosition = req.body;
-    console.log(`Requested ios location [lat, lng] : [${requestData.lat}, ${requestData.lng}]`);
+    console.log(`Requested android location [lat, lng] : [${requestData.lat}, ${requestData.lng}]`);
     child_process.execSync(adbLocationSetCommand
       .replace("{lat}", `${requestData.lat}`)
       .replace("{lng}", `${requestData.lng}`)
