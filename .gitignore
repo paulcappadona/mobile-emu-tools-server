@@ -13,3 +13,5 @@ logs
 results
 build
 .env
+screenshots/**
+

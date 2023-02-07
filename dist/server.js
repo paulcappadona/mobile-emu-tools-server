@@ -20,7 +20,7 @@ const iosLocationSetCommand = 'applesimutils --booted -sl "[{lat}, {lng}]"';
 app.post('/android/screenshot', (req, res) => {
     try {
         const ssRequest = req.body;
-        console.log(`Requested screenshot to ${ssRequest.path}`);
+        console.log(`Requested android screenshot to ${ssRequest.path}`);
         const screenshotBasePath = process.env.SCREENSHOT_BASE_PATH;
         child_process_1.default.execSync(adbCommand.replace("{path}", `${screenshotBasePath}/${ssRequest.path}`));
         res.send();
@@ -61,7 +61,7 @@ app.post('/ios/location', (req, res) => {
 app.post('/android/location', (req, res) => {
     try {
         const requestData = req.body;
-        console.log(`Requested ios location [lat, lng] : [${requestData.lat}, ${requestData.lng}]`);
+        console.log(`Requested android location [lat, lng] : [${requestData.lat}, ${requestData.lng}]`);
         child_process_1.default.execSync(adbLocationSetCommand
             .replace("{lat}", `${requestData.lat}`)
             .replace("{lng}", `${requestData.lng}`));
