@@ -11,6 +11,14 @@ const fs_1 = require("fs");
 const app = (0, express_1.default)();
 app.use(express_1.default.json());
 dotenv_1.default.config({ path: ".env" });
+// setup any static paths we want to host
+const staticPaths = process.env.STATIC_FILE_PATHS;
+if (staticPaths) {
+    staticPaths.split(",").forEach(path => {
+        console.log(`Hosting static files from ${path}`);
+        app.use('/static', express_1.default.static(path));
+    });
+}
 const port = process.env.LISTEN_PORT;
 const adbCommand = "adb exec-out screencap -p > {path}";
 const iosScreenshotCommand = "xcrun simctl io booted screenshot {path}";

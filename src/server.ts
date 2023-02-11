@@ -8,6 +8,16 @@ const app = express();
 app.use(express.json());
 dotenv.config({ path: ".env" });
 
+// setup any static paths we want to host
+const staticPaths = process.env.STATIC_FILE_PATHS;
+if (staticPaths) {
+  staticPaths.split(",").forEach(path => {
+    if (path.length === 0) return;
+    console.log(`Hosting static files from ${path}`);
+    app.use('/static', express.static(path));
+  });
+}
+
 const port = process.env.LISTEN_PORT;
 
 const adbCommand = "adb exec-out screencap -p > {path}";
