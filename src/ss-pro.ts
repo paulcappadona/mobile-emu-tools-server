@@ -58,7 +58,7 @@ class Modification {
     }
     // now add image updates (which will match the names of images uploaded to the bucket)
     // we need to public URL for the image
-    const publicUrlPath = `https://storage.googleapis.com/${process.env.SCREENSHOT_BUCKET}/${imagePath}`;
+    const publicUrlPath = `https://storage.googleapis.com/${process.env.GCLOUD_STORAGE_BUCKET}/${imagePath}`;
     // if we have a single image, the reference is in the form of s1.image
     // otherwise the file name is s1.image1, s1.image2 etc
     if (screen.images.length === 1) {
@@ -68,6 +68,7 @@ class Modification {
         mods.push(new Modification(Modification.elementName(screen.number, MetaTypes.Image, i + 1), MetaAttributes.Screenshot, `${publicUrlPath}/${screen.images[i]}`));
       }
     }
+    // console.debug(`Generated ${mods.length} modifications for screen ${screen.number} : ${JSON.stringify(mods)}`);
     return mods;
   }
 
@@ -117,35 +118,58 @@ export const storeScreenshot = async function (req: express.Request, res: expres
   let locale: string | undefined;
   let device: string | undefined;
 
-  for (const templateUpdate of templateUpdates) {
-    if (platform === templateUpdate.platform &&
-      locale === templateUpdate.locale &&
-      device === templateUpdate.device) continue;
-    
-    platform = templateUpdate.platform;
-    locale = templateUpdate.locale;
-    device = templateUpdate.device;
+  try {
+    for (const templateUpdate of templateUpdates) {
+      if (platform === templateUpdate.platform &&
+        locale === templateUpdate.locale &&
+        device === templateUpdate.device) continue;
+      
+      platform = templateUpdate.platform;
+      locale = templateUpdate.locale;
+      device = templateUpdate.device;
 
-    console.log(`Requested generation of screenshots for ${templateUpdate.platform} for template ${templateUpdate.id} for locale ${templateUpdate.locale}`);
-    // we need to upload the images to a publicly accessible location
+      console.log(`Requested generation of screenshots for ${templateUpdate.platform} for template ${templateUpdate.id} for locale ${templateUpdate.locale}`);
+      // we need to upload the images to a publicly accessible location
 
-    // SCREENSHOT_CAPTURE_PATH="/screenshots/{platform}/{locale}/{device}"
-    const filePattern = process.env.SCREENSHOT_CAPTURE_PATH;
-    const filePath = filePattern!.replace("{platform}", platform)
-      .replace("{locale}", locale)
-      .replace("{device}", device);
-    const bucketPath = process.env.GCLOUD_STORAGE_SS_BASE_PATH!.replace("{platform}", platform)
-      .replace("{locale}", locale)
-      .replace("{device}", device);
+      // SCREENSHOT_CAPTURE_PATH="/screenshots/{platform}/{locale}/{device}"
+      const filePattern = process.env.SCREENSHOT_CAPTURE_PATH;
+      const filePath = filePattern!.replace("{platform}", platform)
+        .replace("{locale}", locale)
+        .replace("{device}", device);
+      const bucketPath = process.env.GCLOUD_STORAGE_SS_BASE_PATH!.replace("{platform}", platform)
+        .replace("{locale}", locale)
+        .replace("{device}", device);
 
-    // we need to upload the images to a publicly accessible location
-    await uploadFilesToBucket(filePath, process.env.SCREENSHOT_BUCKET!, bucketPath)
-      .then(() => console.log("Files uploaded successfully"))
-      .catch(err => console.error("Error uploading files", err));
+      // we need to upload the images to a publicly accessible location
+      await uploadFilesToBucket(filePath, process.env.GCLOUD_STORAGE_BUCKET!, bucketPath)
+        .then(() => console.log("Files uploaded successfully"))
+        .catch((err) => {
+          console.error(`Error uploading device images to bucket ${process.env.GCLOUD_STORAGE_BUCKET}/${bucketPath}`, err)
+          throw new Error(`Error uploading device images to bucket ${process.env.GCLOUD_STORAGE_BUCKET}/${bucketPath}`);
+          // res.status(500).send(`Error uploading device images to bucket ${process.env.GCLOUD_STORAGE_BUCKET}/${bucketPath}`);
+          // return;
+        });
+    }
+
+    // lets submit a request to the screenshots server to generate the screenshots
+    await submitScreenshotRequest(templateUpdates)
+      .then(() => {
+        console.log("Screenshot request submitted successfully");
+        res.status(200).send("Screenshot request submitted successfully");
+      })
+      .catch((err) => {
+        console.error("Error submitting screenshot request", err);
+        throw new Error("Error submitting screenshot request");
+        // res.status(500).send("Error submitting screenshot request");
+      });
+  } catch (err) {
+    console.error("Error processing screenshot request", err);
+    if (err instanceof Error) {
+      res.status(500).send(`${err.message}`);
+    } else {
+      res.status(500).send(`Error processing screenshot request: ${err}`);
+    }
   }
-
-  // lets submit a request to the screenshots server to generate the screenshots
-  await submitScreenshotRequest(templateUpdates);
 }
 
 export async function uploadFilesToBucket(filePath: string, bucketName: string, destinationFolder: string) {
@@ -169,7 +193,17 @@ export async function uploadFilesToBucket(filePath: string, bucketName: string, 
       metadata: {
         cacheControl: 'public, max-age=3600',
       },
-    }).catch(err => console.error(`Error uploading file ${file} to bucket ${bucketName}`, err))
+    }).then((resp) => {
+      if (resp[1].error?.code ?? 200 > 399) {
+        // we have an error
+        console.error(`Error uploading file ${file} to bucket ${bucketName} : ${resp[1].error.code}:${resp[1].error.message}`, resp[1].error);
+        throw new Error(`Error uploading file ${file} to bucket ${bucketName} : ${resp[1].error.code}:${resp[1].error.message}`);
+      }
+      console.log(`File ${file} uploaded to bucket ${bucketName} as ${destination}`);
+    }).catch((err) => {
+      console.error(`Error uploading file ${file} to bucket ${bucketName}`, err);
+      throw err;
+    })
     );
   });
   return Promise.all(promises);
@@ -200,7 +234,11 @@ async function submitScreenshotRequest(templateUpdates: TemplateUpdate[]) {
         },
         body: JSON.stringify(modifications),
       })
-      .then((response) => { 
+      .then((response) => {
+        if (!response.ok) {
+          console.log(`Response from server for template ${template.id} (${template.platform} / ${template.locale} / ${template.device}) :`, response);
+          throw new Error(`Error generating screenshots for template ${template.id} (${template.platform} / ${template.locale} / ${template.device}) : ${response.status} ${response.statusText}`);
+        }
         return response.json() as any;
       })
       .then(async (data: ScreenshotProCreateResponse) =>{
@@ -213,11 +251,11 @@ async function submitScreenshotRequest(templateUpdates: TemplateUpdate[]) {
       })
       .catch((error) => {
         console.error('Error:', error);
+        throw error;
       });
     });
 
-  await Promise.all(templateGenPromises);
-  return;
+  return Promise.all(templateGenPromises);
 }
 
 // download the archive from supplied url

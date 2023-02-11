@@ -67,7 +67,7 @@ app.post('/screenshot/:platform', (req: express.Request, res: express.Response) 
 });
 
 // sends a request to the screenshots pro server to generate screenshots
-app.post('/screenshot/store', storeScreenshot);
+app.post('/store/screenshots', storeScreenshot);
 
 app.post('/permissions/ios', (req: express.Request, res: express.Response) => {
   try {

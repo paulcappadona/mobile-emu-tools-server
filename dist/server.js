@@ -15,6 +15,8 @@ dotenv_1.default.config({ path: ".env" });
 const staticPaths = process.env.STATIC_FILE_PATHS;
 if (staticPaths) {
     staticPaths.split(",").forEach(path => {
+        if (path.length === 0)
+            return;
         console.log(`Hosting static files from ${path}`);
         app.use('/static', express_1.default.static(path));
     });
@@ -54,7 +56,7 @@ app.post('/screenshot/:platform', (req, res) => {
     }
 });
 // sends a request to the screenshots pro server to generate screenshots
-app.post('/screenshot/store', ss_pro_1.storeScreenshot);
+app.post('/store/screenshots', ss_pro_1.storeScreenshot);
 app.post('/permissions/ios', (req, res) => {
     try {
         const requestData = req.body;
