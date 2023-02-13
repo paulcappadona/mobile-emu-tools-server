@@ -264,6 +264,8 @@ async function downloadScreenshots(url, templateUpdate) {
                 return;
             // otherwise lets remove any archive directories that were created
             (0, node_fs_1.rm)(`${outDir}/${archiveParentDir}`, { recursive: true, force: true }, (err) => console.log(`Error removing archive directory ${archiveParentDir}: `, err));
+            // lets also remove the zip archive
+            (0, node_fs_1.rm)(destination, { recursive: true, force: true }, (err) => console.log(`Error removing archive ${destination}: `, err));
         })
             .catch((err) => {
             console.error(`Error extracting ${destination} to ${outDir}`, err);
