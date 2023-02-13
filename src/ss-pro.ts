@@ -118,58 +118,49 @@ export const storeScreenshot = async function (req: express.Request, res: expres
   let locale: string | undefined;
   let device: string | undefined;
 
-  try {
-    for (const templateUpdate of templateUpdates) {
-      if (platform === templateUpdate.platform &&
-        locale === templateUpdate.locale &&
-        device === templateUpdate.device) continue;
-      
-      platform = templateUpdate.platform;
-      locale = templateUpdate.locale;
-      device = templateUpdate.device;
+  for (const templateUpdate of templateUpdates) {
+    if (platform === templateUpdate.platform &&
+      locale === templateUpdate.locale &&
+      device === templateUpdate.device) continue;
+    
+    platform = templateUpdate.platform;
+    locale = templateUpdate.locale;
+    device = templateUpdate.device;
 
-      console.log(`Requested generation of screenshots for ${templateUpdate.platform} for template ${templateUpdate.id} for locale ${templateUpdate.locale}`);
-      // we need to upload the images to a publicly accessible location
+    console.log(`Requested generation of screenshots for ${templateUpdate.platform} for template ${templateUpdate.id} for locale ${templateUpdate.locale}`);
+    // we need to upload the images to a publicly accessible location
 
-      // SCREENSHOT_CAPTURE_PATH="/screenshots/{platform}/{locale}/{device}"
-      const filePattern = process.env.SCREENSHOT_CAPTURE_PATH;
-      const filePath = filePattern!.replace("{platform}", platform)
-        .replace("{locale}", locale)
-        .replace("{device}", device);
-      const bucketPath = process.env.GCLOUD_STORAGE_SS_BASE_PATH!.replace("{platform}", platform)
-        .replace("{locale}", locale)
-        .replace("{device}", device);
+    // SCREENSHOT_CAPTURE_PATH="/screenshots/{platform}/{locale}/{device}"
+    const filePattern = process.env.SCREENSHOT_CAPTURE_PATH;
+    const filePath = filePattern!.replace("{platform}", platform)
+      .replace("{locale}", locale)
+      .replace("{device}", device);
+    const bucketPath = process.env.GCLOUD_STORAGE_SS_BASE_PATH!.replace("{platform}", platform)
+      .replace("{locale}", locale)
+      .replace("{device}", device);
 
-      // we need to upload the images to a publicly accessible location
-      await uploadFilesToBucket(filePath, process.env.GCLOUD_STORAGE_BUCKET!, bucketPath)
-        .then(() => console.log("Files uploaded successfully"))
-        .catch((err) => {
-          console.error(`Error uploading device images to bucket ${process.env.GCLOUD_STORAGE_BUCKET}/${bucketPath}`, err)
-          throw new Error(`Error uploading device images to bucket ${process.env.GCLOUD_STORAGE_BUCKET}/${bucketPath}`);
-          // res.status(500).send(`Error uploading device images to bucket ${process.env.GCLOUD_STORAGE_BUCKET}/${bucketPath}`);
-          // return;
-        });
-    }
-
-    // lets submit a request to the screenshots server to generate the screenshots
-    await submitScreenshotRequest(templateUpdates)
-      .then(() => {
-        console.log("Screenshot request submitted successfully");
-        res.status(200).send("Screenshot request submitted successfully");
-      })
+    // we need to upload the images to a publicly accessible location
+    await uploadFilesToBucket(filePath, process.env.GCLOUD_STORAGE_BUCKET!, bucketPath)
+      .then(() => console.log("Files uploaded successfully"))
       .catch((err) => {
-        console.error("Error submitting screenshot request", err);
-        throw new Error("Error submitting screenshot request");
-        // res.status(500).send("Error submitting screenshot request");
+        console.error(`Error uploading device images to bucket ${process.env.GCLOUD_STORAGE_BUCKET}/${bucketPath}`, err)
+        res.status(500).send(`Error uploading device images to bucket ${process.env.GCLOUD_STORAGE_BUCKET}/${bucketPath}`);
+        return;
       });
-  } catch (err) {
-    console.error("Error processing screenshot request", err);
-    if (err instanceof Error) {
-      res.status(500).send(`${err.message}`);
-    } else {
-      res.status(500).send(`Error processing screenshot request: ${err}`);
-    }
   }
+
+  // lets submit a request to the screenshots server to generate the screenshots
+  await submitScreenshotRequest(templateUpdates)
+    .then(() => {
+      console.log("Screenshot request submitted successfully");
+      res.status(200).send("Screenshot request submitted successfully");
+      return;
+    })
+    .catch((err) => {
+      console.error("Error submitting screenshot request", err);
+      res.status(500).send("Error submitting screenshot request");
+      return;
+    });
 }
 
 export async function uploadFilesToBucket(filePath: string, bucketName: string, destinationFolder: string) {
@@ -187,7 +178,8 @@ export async function uploadFilesToBucket(filePath: string, bucketName: string, 
 
   files.forEach(file => {
     const destination = `${destinationFolder}/${file}`;
-    promises.push(bucket.upload(`${filePath}/${file}`, {
+    promises.push(bucket.upload(`${filePath}/${file}`,
+    {
       destination: destination,
       public: true,
       metadata: {
@@ -200,9 +192,6 @@ export async function uploadFilesToBucket(filePath: string, bucketName: string, 
         throw new Error(`Error uploading file ${file} to bucket ${bucketName} : ${resp[1].error.code}:${resp[1].error.message}`);
       }
       console.log(`File ${file} uploaded to bucket ${bucketName} as ${destination}`);
-    }).catch((err) => {
-      console.error(`Error uploading file ${file} to bucket ${bucketName}`, err);
-      throw err;
     })
     );
   });
@@ -227,7 +216,7 @@ async function submitScreenshotRequest(templateUpdates: TemplateUpdate[]) {
     });
 
     console.log(`Submitting request for template ${template.id} (${template.platform} / ${template.locale} / ${template.device})`);
-    fetch(endpoint.replace("{template_id}", template.id), {
+    return fetch(endpoint.replace("{template_id}", template.id), {
         method: 'POST',
         headers: {
           'Bearer': token,
@@ -237,7 +226,7 @@ async function submitScreenshotRequest(templateUpdates: TemplateUpdate[]) {
       .then((response) => {
         if (!response.ok) {
           console.log(`Response from server for template ${template.id} (${template.platform} / ${template.locale} / ${template.device}) :`, response);
-          throw new Error(`Error generating screenshots for template ${template.id} (${template.platform} / ${template.locale} / ${template.device}) : ${response.status} ${response.statusText}`);
+          throw new Error(`Generating screenshots for template ${template.id} (${template.platform} / ${template.locale} / ${template.device}) : ${response.status} ${response.statusText}`);
         }
         return response.json() as any;
       })
@@ -248,10 +237,6 @@ async function submitScreenshotRequest(templateUpdates: TemplateUpdate[]) {
           // lets get the generated screenshots and extract them to the correct location
           return await downloadScreenshots(data.download_url, template);
         }
-      })
-      .catch((error) => {
-        console.error('Error:', error);
-        throw error;
       });
     });
 
@@ -271,46 +256,51 @@ async function downloadScreenshots(url: string, templateUpdate: TemplateUpdate) 
     .replace("{device}", templateUpdate.device);
 
   const destination = `${outDir}/${templateUpdate.sequence}.zip`;
-  await downloadFile(url, destination);
+  try {
+    await downloadFile(url, destination);
 
-  let archiveParentDir : string | undefined;
-  // extract the files
-  await extract(destination, 
-    {
-      dir: outDir,
-      onEntry(entry, zipfile) {
-        // rename the files
-        const filename = entry.fileName;
-        // if the filename is an image (ends in png) then we want to rename it, otherwise ignore
-        if (!filename.endsWith(".png")) {
-          archiveParentDir ??= filename;
-          return;
-        }
+    let archiveParentDir : string | undefined;
+    // extract the files
+    await extract(destination, 
+      {
+        dir: outDir,
+        onEntry(entry, zipfile) {
+          // rename the files
+          const filename = entry.fileName;
+          // if the filename is an image (ends in png) then we want to rename it, otherwise ignore
+          if (!filename.endsWith(".png")) {
+            archiveParentDir ??= filename;
+            return;
+          }
 
-        // filename wll be in the format {path}/{order}.png, we want to extract the order element
-        const pathElements = filename.split("/");
-        const name = pathElements[pathElements.length - 1].split(".")[0];
-        let filePattern = process.env.OUTPUT_FILE_PATTERN!;
-        const newFilename = filePattern.replace("{platform}", templateUpdate.platform)
-          .replace("{sequence}", `${templateUpdate.sequence}`)
-          .replace("{name}", name)
-          .replace("{locale}", templateUpdate.locale)
-          .replace("{device}", templateUpdate.device);
-        console.log(`Renaming ${filename} to ${newFilename}`);
-        entry.fileName = newFilename;
-      },
-    })
-    .then(() => console.log("Extraction complete"))
-    .then(() => {
-      if (archiveParentDir === undefined) return;
-      // otherwise lets remove any archive direcotries that were created
-      rm(`${outDir}/${archiveParentDir}`, { recursive: true, force: true },
-        (err) => console.log(`Error removing archive directory ${archiveParentDir}: `, err));
-    })
-    .catch((err) => {
-      console.error(`Error extracting ${destination} to ${outDir}`, err);
-      throw err;
-    });
+          // filename wll be in the format {path}/{order}.png, we want to extract the order element
+          const pathElements = filename.split("/");
+          const name = pathElements[pathElements.length - 1].split(".")[0];
+          let filePattern = process.env.OUTPUT_FILE_PATTERN!;
+          const newFilename = filePattern.replace("{platform}", templateUpdate.platform)
+            .replace("{sequence}", `${templateUpdate.sequence}`)
+            .replace("{name}", name)
+            .replace("{locale}", templateUpdate.locale)
+            .replace("{device}", templateUpdate.device);
+          console.log(`Renaming ${filename} to ${newFilename}`);
+          entry.fileName = newFilename;
+        },
+      })
+      .then(() => console.log("Extraction complete"))
+      .then(() => {
+        if (archiveParentDir === undefined) return;
+        // otherwise lets remove any archive direcotries that were created
+        rm(`${outDir}/${archiveParentDir}`, { recursive: true, force: true },
+          (err) => console.log(`Error removing archive directory ${archiveParentDir}: `, err));
+      })
+      .catch((err) => {
+        console.error(`Error extracting ${destination} to ${outDir}`, err);
+        throw err;
+      });
+  } catch (err) {
+    console.error(`Error processing generated screenshots ${url}`, err);
+    throw err;
+  }
 }
 
 export async function downloadFile(url: string, destination: string) {
@@ -319,5 +309,5 @@ export async function downloadFile(url: string, destination: string) {
 
   const fileStream = createWriteStream(destination);
   response.body?.pipe(fileStream);
-  await new Promise(fulfill => fileStream.on("finish", fulfill));
+  return await new Promise(fulfill => fileStream.on("finish", fulfill));
 }
