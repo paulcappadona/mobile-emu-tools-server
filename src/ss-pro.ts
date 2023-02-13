@@ -299,10 +299,14 @@ async function downloadScreenshots(url: string, templateUpdate: TemplateUpdate) 
         if (archiveParentDir === undefined) return;
         // otherwise lets remove any archive directories that were created
         rm(`${outDir}/${archiveParentDir}`, { recursive: true, force: true },
-          (err) => console.log(`Error removing archive directory ${archiveParentDir}: `, err));
+          (err) => {
+            if (err) console.log(`Error removing archive directory ${archiveParentDir}: `, err);
+          });
         // lets also remove the zip archive
         rm(destination, { recursive: true, force: true },
-          (err) => console.log(`Error removing archive ${destination}: `, err));
+          (err) => {
+            if (err) console.log(`Error removing archive ${destination}: `, err);
+          });
       })
       .catch((err) => {
         console.error(`Error extracting ${destination} to ${outDir}`, err);
