@@ -215,13 +215,16 @@ async function submitScreenshotRequest(templateUpdates: TemplateUpdate[]) {
       modifications.push(...Modification.fromScreenMeta(imagesBucketPath, screen));
     });
 
+    const apiUrl = endpoint.replace("{template_id}", template.id);
     console.log(`Submitting request for template ${template.id} (${template.platform} / ${template.locale} / ${template.device})`);
-    return fetch(endpoint.replace("{template_id}", template.id), {
-        method: 'POST',
+    const reqBody = { modifications: modifications };
+    return fetch(apiUrl, {
+        method: 'post',
         headers: {
-          'Bearer': token,
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify(modifications),
+        body: JSON.stringify(reqBody),
       })
       .then((response) => {
         if (!response.ok) {

@@ -186,13 +186,16 @@ async function submitScreenshotRequest(templateUpdates) {
         template.screens.map((screen) => {
             modifications.push(...Modification.fromScreenMeta(imagesBucketPath, screen));
         });
+        const apiUrl = endpoint.replace("{template_id}", template.id);
         console.log(`Submitting request for template ${template.id} (${template.platform} / ${template.locale} / ${template.device})`);
-        return (0, node_fetch_1.default)(endpoint.replace("{template_id}", template.id), {
-            method: 'POST',
+        const reqBody = { modifications: modifications };
+        return (0, node_fetch_1.default)(apiUrl, {
+            method: 'post',
             headers: {
-                'Bearer': token,
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
             },
-            body: JSON.stringify(modifications),
+            body: JSON.stringify(reqBody),
         })
             .then((response) => {
             if (!response.ok) {
