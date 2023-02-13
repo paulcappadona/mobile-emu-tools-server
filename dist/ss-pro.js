@@ -228,6 +228,10 @@ async function downloadScreenshots(url, templateUpdate) {
         .replace("{device}", templateUpdate.device);
     const destination = `${outDir}/${templateUpdate.sequence}.zip`;
     try {
+        // create the output directory if it doesn't exist
+        if (!(0, node_fs_1.existsSync)(outDir)) {
+            (0, node_fs_1.mkdirSync)(outDir, { recursive: true });
+        }
         await downloadFile(url, destination);
         let archiveParentDir;
         // extract the files
@@ -258,7 +262,7 @@ async function downloadScreenshots(url, templateUpdate) {
             .then(() => {
             if (archiveParentDir === undefined)
                 return;
-            // otherwise lets remove any archive direcotries that were created
+            // otherwise lets remove any archive directories that were created
             (0, node_fs_1.rm)(`${outDir}/${archiveParentDir}`, { recursive: true, force: true }, (err) => console.log(`Error removing archive directory ${archiveParentDir}: `, err));
         })
             .catch((err) => {
@@ -278,6 +282,6 @@ async function downloadFile(url, destination) {
         throw new Error(`unexpected response ${response.statusText}`);
     const fileStream = (0, node_fs_1.createWriteStream)(destination);
     (_a = response.body) === null || _a === void 0 ? void 0 : _a.pipe(fileStream);
-    return await new Promise(fulfill => fileStream.on("finish", fulfill));
+    return new Promise(fulfill => fileStream.on("finish", fulfill));
 }
 exports.downloadFile = downloadFile;

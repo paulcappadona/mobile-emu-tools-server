@@ -98,7 +98,7 @@ interface ResponseDetail {
 
 import express from 'express';
 import * as googlestorage from '@google-cloud/storage';
-import {createWriteStream, readdirSync, rm } from 'node:fs';
+import {createWriteStream, existsSync, mkdirSync, readdirSync, rm } from 'node:fs';
 import fetch from 'node-fetch';
 import extract from 'extract-zip';
 
@@ -260,6 +260,11 @@ async function downloadScreenshots(url: string, templateUpdate: TemplateUpdate) 
 
   const destination = `${outDir}/${templateUpdate.sequence}.zip`;
   try {
+    // create the output directory if it doesn't exist
+    if (!existsSync(outDir)) {
+      mkdirSync(outDir, { recursive: true });
+    }
+
     await downloadFile(url, destination);
 
     let archiveParentDir : string | undefined;
@@ -292,7 +297,7 @@ async function downloadScreenshots(url: string, templateUpdate: TemplateUpdate) 
       .then(() => console.log("Extraction complete"))
       .then(() => {
         if (archiveParentDir === undefined) return;
-        // otherwise lets remove any archive direcotries that were created
+        // otherwise lets remove any archive directories that were created
         rm(`${outDir}/${archiveParentDir}`, { recursive: true, force: true },
           (err) => console.log(`Error removing archive directory ${archiveParentDir}: `, err));
       })
@@ -312,5 +317,5 @@ export async function downloadFile(url: string, destination: string) {
 
   const fileStream = createWriteStream(destination);
   response.body?.pipe(fileStream);
-  return await new Promise(fulfill => fileStream.on("finish", fulfill));
+  return new Promise(fulfill => fileStream.on("finish", fulfill));
 }
