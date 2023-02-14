@@ -57,6 +57,7 @@ app.post('/screenshot/:platform', (req, res) => {
 });
 // sends a request to the screenshots pro server to generate screenshots
 app.post('/store/screenshots', ss_pro_1.storeScreenshot);
+app.get('/store/screenshots/status', ss_pro_1.storeScreenshotStatus);
 app.post('/permissions/ios', (req, res) => {
     try {
         const requestData = req.body;

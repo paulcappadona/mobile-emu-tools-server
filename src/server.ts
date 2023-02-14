@@ -1,7 +1,7 @@
 import express from 'express';
 import child_process from 'child_process';
 import dotenv from 'dotenv';
-import { Platform, storeScreenshot } from './ss-pro';
+import { Platform, storeScreenshot, storeScreenshotStatus } from './ss-pro';
 import { mkdirSync } from 'fs';
 
 const app = express();
@@ -68,6 +68,8 @@ app.post('/screenshot/:platform', (req: express.Request, res: express.Response) 
 
 // sends a request to the screenshots pro server to generate screenshots
 app.post('/store/screenshots', storeScreenshot);
+
+app.get('/store/screenshots/status', storeScreenshotStatus);
 
 app.post('/permissions/ios', (req: express.Request, res: express.Response) => {
   try {

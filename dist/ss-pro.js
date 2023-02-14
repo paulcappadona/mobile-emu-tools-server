@@ -26,7 +26,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.downloadFile = exports.uploadFilesToBucket = exports.storeScreenshot = exports.Platform = void 0;
+exports.downloadFile = exports.uploadFilesToBucket = exports.storeScreenshot = exports.storeScreenshotStatus = exports.Platform = void 0;
 var MetaTypes;
 (function (MetaTypes) {
     MetaTypes["Heading"] = "heading";
@@ -86,9 +86,14 @@ const googlestorage = __importStar(require("@google-cloud/storage"));
 const node_fs_1 = require("node:fs");
 const node_fetch_1 = __importDefault(require("node-fetch"));
 const extract_zip_1 = __importDefault(require("extract-zip"));
-const AndroidScreenshotPattern = "{platform}/fastlane/metadata/android/{locale}/images/phoneScreenshots/{sequence}{name}";
-const IosScreenshotPattern = "{platform}/fastlane/screenshots/{locale}/{sequence}{name}_{device}.png";
 const storage = new googlestorage.Storage();
+// a count of the active requests to generate screenshots (as these are long running)
+let screenshotGenerationCount = 0;
+const storeScreenshotStatus = async function (req, res) {
+    res.status(200).send({ active: screenshotGenerationCount });
+    return;
+};
+exports.storeScreenshotStatus = storeScreenshotStatus;
 // we need an express function to take a list of images, upload to a publicly accessible
 // location, and then send a request with modification details to the server
 const storeScreenshot = async function (req, res) {
@@ -197,6 +202,7 @@ async function submitScreenshotRequest(templateUpdates) {
     for (const batch of templateBatches) {
         console.log(`Submitting batch ${batchNumber} of ${templateBatches.length}`);
         const templateGenPromises = batch.map(async (template) => {
+            screenshotGenerationCount++;
             const imagesBucketPath = process.env.GCLOUD_STORAGE_SS_BASE_PATH.replace("{platform}", template.platform)
                 .replace("{locale}", template.locale)
                 .replace("{device}", template.device);
@@ -233,7 +239,8 @@ async function submitScreenshotRequest(templateUpdates) {
                     // lets get the generated screenshots and extract them to the correct location
                     return await downloadScreenshots(data.download_url, template);
                 }
-            });
+            })
+                .finally(() => screenshotGenerationCount--);
         });
         const batchPromises = Promise.all(templateGenPromises);
         submissionPromises.push(batchPromises);

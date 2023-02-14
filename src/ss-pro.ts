@@ -108,10 +108,15 @@ import {createWriteStream, existsSync, mkdirSync, readdirSync, rm } from 'node:f
 import fetch from 'node-fetch';
 import extract from 'extract-zip';
 
-const AndroidScreenshotPattern = "{platform}/fastlane/metadata/android/{locale}/images/phoneScreenshots/{sequence}{name}";
-const IosScreenshotPattern = "{platform}/fastlane/screenshots/{locale}/{sequence}{name}_{device}.png";
-
 const storage = new googlestorage.Storage();
+
+// a count of the active requests to generate screenshots (as these are long running)
+let screenshotGenerationCount = 0;
+
+export const storeScreenshotStatus = async function (req: express.Request, res: express.Response) {
+  res.status(200).send({ active: screenshotGenerationCount });
+  return;
+}
 
 // we need an express function to take a list of images, upload to a publicly accessible
 // location, and then send a request with modification details to the server
@@ -231,6 +236,7 @@ async function submitScreenshotRequest(templateUpdates: TemplateUpdate[]) {
   for (const batch of templateBatches) {
     console.log(`Submitting batch ${batchNumber} of ${templateBatches.length}`);
     const templateGenPromises = batch.map(async (template) => {
+      screenshotGenerationCount++;
       const imagesBucketPath = process.env.GCLOUD_STORAGE_SS_BASE_PATH!.replace("{platform}", template.platform)
         .replace("{locale}", template.locale)
         .replace("{device}", template.device);
@@ -269,7 +275,8 @@ async function submitScreenshotRequest(templateUpdates: TemplateUpdate[]) {
             // lets get the generated screenshots and extract them to the correct location
             return await downloadScreenshots(data.download_url, template);
           }
-        });
+        })
+        .finally(() => screenshotGenerationCount--);
       });
 
     const batchPromises = Promise.all(templateGenPromises);
