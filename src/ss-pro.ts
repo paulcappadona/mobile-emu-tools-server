@@ -9,6 +9,12 @@ interface TemplateUpdate {
   device: string;
   locale: string;
   screens: ScreenMeta[];
+  // The path to the result output directory
+  // This will be appended to the respective platform path [IOS|ANDROID]_SCREENSHOT_OUTPUT_BASE_PATH
+  outDir?: string;
+  // Override of file names that we will output from the template archive (in order)
+  // Blank entries will default to the env variable OUTPUT_FILE_PATTERN
+  outFiles?: string[];
 }
 
 interface ScreenMeta {
@@ -204,46 +210,80 @@ async function submitScreenshotRequest(templateUpdates: TemplateUpdate[]) {
   const token = process.env.SSPRO_API_KEY!;
   const downloadUrls: string[] = [];
 
-  const templateGenPromises = templateUpdates.map((template) => {
-    const imagesBucketPath = process.env.GCLOUD_STORAGE_SS_BASE_PATH!.replace("{platform}", template.platform)
-      .replace("{locale}", template.locale)
-      .replace("{device}", template.device);
+  // we want to batch up the requests to the server, 2 at a time, otherwise we'll run into rate limits
+  // lets split templateUpdates into batches of 2
+  const templateBatches: TemplateUpdate[][] = [];
+  let batch: TemplateUpdate[] = [];
+  for (const template of templateUpdates) {
+    batch.push(template);
+    if (batch.length === 2) {
+      templateBatches.push(batch);
+      batch = [];
+    }
+  }
+  if (batch.length > 0) {
+    templateBatches.push(batch);
+  }
 
-      // we need to build a list of modifications
-    const modifications: Modification[] = [];
-    template.screens.map((screen) => {
-      modifications.push(...Modification.fromScreenMeta(imagesBucketPath, screen));
-    });
+  console.log(`Submitting ${templateBatches.length} batches of requests to ${host}${endpoint}`);
+  let batchNumber = 1;
+  const submissionPromises: Promise<any>[] = [];
+  for (const batch of templateBatches) {
+    console.log(`Submitting batch ${batchNumber} of ${templateBatches.length}`);
+    const templateGenPromises = batch.map(async (template) => {
+      const imagesBucketPath = process.env.GCLOUD_STORAGE_SS_BASE_PATH!.replace("{platform}", template.platform)
+        .replace("{locale}", template.locale)
+        .replace("{device}", template.device);
 
-    const apiUrl = endpoint.replace("{template_id}", template.id);
-    console.log(`Submitting request for template ${template.id} (${template.platform} / ${template.locale} / ${template.device})`);
-    const reqBody = { modifications: modifications };
-    return fetch(apiUrl, {
-        method: 'post',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(reqBody),
-      })
-      .then((response) => {
-        if (!response.ok) {
-          console.log(`Response from server for template ${template.id} (${template.platform} / ${template.locale} / ${template.device}) :`, response);
-          throw new Error(`Generating screenshots for template ${template.id} (${template.platform} / ${template.locale} / ${template.device}) : ${response.status} ${response.statusText}`);
-        }
-        return response.json() as any;
-      })
-      .then(async (data: ScreenshotProCreateResponse) =>{
-        console.log(`Success generating screenshots for template ${template.id} (${template.platform} / ${template.locale} / ${template.device}) :`, data);
-        if (data.download_url !== undefined) {
-          downloadUrls.push(data.download_url);
-          // lets get the generated screenshots and extract them to the correct location
-          return await downloadScreenshots(data.download_url, template);
-        }
+        // we need to build a list of modifications
+      const modifications: Modification[] = [];
+      template.screens.map((screen) => {
+        modifications.push(...Modification.fromScreenMeta(imagesBucketPath, screen));
       });
-    });
 
-  return Promise.all(templateGenPromises);
+      const apiUrl = endpoint.replace("{template_id}", template.id);
+      console.log(`Submitting request for template ${template.id} (${template.platform} / ${template.locale} / ${template.device})`);
+      const reqBody = { modifications: modifications };
+      // console.debug("--------------------");
+      // console.debug(`Request body : ${JSON.stringify(reqBody)}`);
+      // console.debug("--------------------");
+      return fetch(apiUrl, {
+          method: 'post',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(reqBody),
+        })
+        .then((response) => {
+          if (!response.ok) {
+            console.log(`Response from server for template ${template.id} (${template.platform} / ${template.locale} / ${template.device}) :`, response);
+            throw new Error(`Generating screenshots for template ${template.id} (${template.platform} / ${template.locale} / ${template.device}) : ${response.status} ${response.statusText}`);
+          }
+          return response.json() as any;
+        })
+        .then(async (data: ScreenshotProCreateResponse) =>{
+          console.log(`Success generating screenshots for template ${template.id} (${template.platform} / ${template.locale} / ${template.device}) :`, data);
+          if (data.download_url !== undefined) {
+            downloadUrls.push(data.download_url);
+            // lets get the generated screenshots and extract them to the correct location
+            return await downloadScreenshots(data.download_url, template);
+          }
+        });
+      });
+
+    const batchPromises = Promise.all(templateGenPromises);
+    submissionPromises.push(batchPromises);
+    // wait for the batch to finish processing before sending next batch
+    console.log(`Waiting for batch ${batchNumber} of ${templateBatches.length} to finish processing...`);
+    await batchPromises.catch((err) => {
+      console.error(`Error processing batch : ${err}`);
+    });
+    console.log(`Batch ${batchNumber} of ${templateBatches.length} complete`);
+    batchNumber++;
+  }
+
+  return submissionPromises;
 }
 
 // download the archive from supplied url
@@ -253,6 +293,17 @@ async function downloadScreenshots(url: string, templateUpdate: TemplateUpdate) 
   if (templateUpdate.platform === Platform.Android) {
     outDir = process.env.ANDROID_SCREENSHOT_OUTPUT_BASE_PATH!;
   }
+
+  // console.debug(`Processing template update with outDir [${templateUpdate.outDir}]`);
+  // console.debug("--------------------");
+  // console.debug(`${JSON.stringify(templateUpdate)}`);
+  // console.debug("--------------------");
+  if ((templateUpdate.outDir?.length ?? 0) > 0) {
+    // append the outDir to the base path
+    console.debug(`Appending outDir ${templateUpdate.outDir} to base path ${outDir}`);
+    outDir = `${outDir}/${templateUpdate.outDir}`;
+  }
+
   outDir = outDir.replace("{platform}", templateUpdate.platform)
     .replace("{sequence}", `${templateUpdate.sequence}`)
     .replace("{locale}", templateUpdate.locale)
@@ -268,6 +319,7 @@ async function downloadScreenshots(url: string, templateUpdate: TemplateUpdate) 
     await downloadFile(url, destination);
 
     let archiveParentDir : string | undefined;
+    let fileCounter = 0;
     // extract the files
     await extract(destination, 
       {
@@ -285,6 +337,14 @@ async function downloadScreenshots(url: string, templateUpdate: TemplateUpdate) 
           const pathElements = filename.split("/");
           const name = pathElements[pathElements.length - 1].split(".")[0];
           let filePattern = process.env.OUTPUT_FILE_PATTERN!;
+          if ((templateUpdate.outFiles?.length ?? 0) > 0) {
+            if ((templateUpdate.outFiles?.length ?? 0) < fileCounter) {
+              throw new Error(`Not enough output file patterns supplied in template update, failed processing file ${fileCounter + 1 }
+               with name ${name}, but only ${templateUpdate.outFiles?.length ?? 0} patterns supplied`);
+            }
+            // lets substitute the file pattern with the one from the template
+            filePattern = templateUpdate.outFiles![fileCounter++];
+          }
           const newFilename = filePattern.replace("{platform}", templateUpdate.platform)
             .replace("{sequence}", `${templateUpdate.sequence}`)
             .replace("{name}", name)
@@ -292,6 +352,7 @@ async function downloadScreenshots(url: string, templateUpdate: TemplateUpdate) 
             .replace("{device}", templateUpdate.device);
           console.log(`Renaming ${filename} to ${newFilename}`);
           entry.fileName = newFilename;
+          fileCounter++;
         },
       })
       .then(() => console.log("Extraction complete"))
