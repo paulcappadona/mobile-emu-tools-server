@@ -214,9 +214,9 @@ async function submitScreenshotRequest(templateUpdates) {
             const apiUrl = endpoint.replace("{template_id}", template.id);
             console.log(`Submitting request for template ${template.id} (${template.platform} / ${template.locale} / ${template.device})`);
             const reqBody = { modifications: modifications };
-            // console.debug("--------------------");
-            // console.debug(`Request body : ${JSON.stringify(reqBody)}`);
-            // console.debug("--------------------");
+            console.debug("--------------------");
+            console.debug(`Request body : ${JSON.stringify(reqBody)}`);
+            console.debug("--------------------");
             return (0, node_fetch_1.default)(apiUrl, {
                 method: 'post',
                 headers: {
@@ -224,6 +224,27 @@ async function submitScreenshotRequest(templateUpdates) {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(reqBody),
+            })
+                .then((response) => {
+                if (!response.ok) {
+                    console.log(`Response from server for template ${template.id} (${template.platform} / ${template.locale} / ${template.device}) :`, response);
+                    // sometimes we see random generation errors, so we'll retry the request
+                    if (response.status < 500) {
+                        throw new Error(`Generating screenshots for template ${template.id} (${template.platform} / ${template.locale} / ${template.device}) : ${response.status} ${response.statusText}`);
+                    }
+                    else {
+                        console.log(`Retrying request for template ${template.id} (${template.platform} / ${template.locale} / ${template.device})`);
+                        return (0, node_fetch_1.default)(apiUrl, {
+                            method: 'post',
+                            headers: {
+                                'Authorization': `Bearer ${token}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(reqBody),
+                        });
+                    }
+                }
+                return response;
             })
                 .then((response) => {
                 if (!response.ok) {
