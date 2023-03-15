@@ -228,6 +228,27 @@ async function submitScreenshotRequest(templateUpdates) {
                 .then((response) => {
                 if (!response.ok) {
                     console.log(`Response from server for template ${template.id} (${template.platform} / ${template.locale} / ${template.device}) :`, response);
+                    // sometimes we see random generation errors, so we'll retry the request
+                    if (response.status < 500) {
+                        throw new Error(`Generating screenshots for template ${template.id} (${template.platform} / ${template.locale} / ${template.device}) : ${response.status} ${response.statusText}`);
+                    }
+                    else {
+                        console.log(`Retrying request for template ${template.id} (${template.platform} / ${template.locale} / ${template.device})`);
+                        return (0, node_fetch_1.default)(apiUrl, {
+                            method: 'post',
+                            headers: {
+                                'Authorization': `Bearer ${token}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(reqBody),
+                        });
+                    }
+                }
+                return response;
+            })
+                .then((response) => {
+                if (!response.ok) {
+                    console.log(`Response from server for template ${template.id} (${template.platform} / ${template.locale} / ${template.device}) :`, response);
                     throw new Error(`Generating screenshots for template ${template.id} (${template.platform} / ${template.locale} / ${template.device}) : ${response.status} ${response.statusText}`);
                 }
                 return response.json();
@@ -315,7 +336,6 @@ async function downloadScreenshots(url, templateUpdate) {
                     .replace("{device}", templateUpdate.device);
                 console.log(`Renaming ${filename} to ${newFilename}`);
                 entry.fileName = newFilename;
-                fileCounter++;
             },
         })
             .then(() => console.log("Extraction complete"))
