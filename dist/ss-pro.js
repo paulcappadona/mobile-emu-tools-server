@@ -214,9 +214,9 @@ async function submitScreenshotRequest(templateUpdates) {
             const apiUrl = endpoint.replace("{template_id}", template.id);
             console.log(`Submitting request for template ${template.id} (${template.platform} / ${template.locale} / ${template.device})`);
             const reqBody = { modifications: modifications };
-            console.debug("--------------------");
-            console.debug(`Request body : ${JSON.stringify(reqBody)}`);
-            console.debug("--------------------");
+            // console.debug("--------------------");
+            // console.debug(`Request body : ${JSON.stringify(reqBody)}`);
+            // console.debug("--------------------");
             return (0, node_fetch_1.default)(apiUrl, {
                 method: 'post',
                 headers: {
@@ -336,7 +336,6 @@ async function downloadScreenshots(url, templateUpdate) {
                     .replace("{device}", templateUpdate.device);
                 console.log(`Renaming ${filename} to ${newFilename}`);
                 entry.fileName = newFilename;
-                fileCounter++;
             },
         })
             .then(() => console.log("Extraction complete"))
