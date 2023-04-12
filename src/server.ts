@@ -20,11 +20,15 @@ if (staticPaths) {
 
 const port = process.env.LISTEN_PORT;
 
-const adbCommand = "adb exec-out screencap -p > {path}";
+const adbScreenshotCommand = "adb exec-out screencap -p > {path}";
 const iosScreenshotCommand = "xcrun simctl io booted screenshot {path}";
 const iosPermsCommand = "applesimutils --booted --bundle {bundleId} --setPermissions \"{perms}\"";
 const adbLocationSetCommand = 'adb emu geo fix {lng} {lat}';
 const iosLocationSetCommand = 'applesimutils --booted -sl "[{lat}, {lng}]"';
+const adbDeeplinkCommand = "adb shell am start -a android.intent.action.VIEW \
+  -c android.intent.category.BROWSABLE \
+  -d {link} {packageId}";
+const iosDeeplinkCommand = "xcrun simctl openurl booted {link}";
 
 interface Screenshot {
   locale: string;
@@ -42,6 +46,11 @@ interface GpsPosition {
   lng: number;
 };
 
+interface Deeplink {
+  link: string;
+  packageId?: string;
+};
+
 app.post('/screenshot/:platform', (req: express.Request, res: express.Response) => {
   try {
     // convert platform to Platform enum
@@ -54,7 +63,7 @@ app.post('/screenshot/:platform', (req: express.Request, res: express.Response) 
     const path = screenshotBasePath?.replace("{platform}", platform).replace("{locale}", locale).replace("{device}", device);
     // if the filesystem path doesn't exist, create it
     mkdirSync(path, { recursive: true });
-    let ssCommand = adbCommand;
+    let ssCommand = adbScreenshotCommand;
     if (platform === Platform.IOS) {
       ssCommand = iosScreenshotCommand;
     }
@@ -99,6 +108,26 @@ app.post('/location/:platform', (req: express.Request, res: express.Response) =>
       .replace("{lat}", `${requestData.lat}`)
       .replace("{lng}", `${requestData.lng}`)
     );
+    res.send();
+  } catch (e) {
+    console.error(e);
+    res.status(500).send(`Error: ${e}`);
+  }
+});
+
+app.post('/deeplink/:platform', (req: express.Request, res: express.Response) => {
+  try {
+    // convert platform to Platform enum
+    const platform: Platform = req.params.platform as Platform;
+    const ssRequest: Deeplink = req.body;
+    const link = ssRequest.link;
+    const packageId = ssRequest.packageId ?? "";
+    console.log(`Simulating deeplink ${link} for ${platform}`);
+    let deeplinkCommand = adbDeeplinkCommand;
+    if (platform === Platform.IOS) {
+      deeplinkCommand = iosDeeplinkCommand;
+    }
+    child_process.execSync(deeplinkCommand.replace("{link}", link).replace("{packageId}", packageId));
     res.send();
   } catch (e) {
     console.error(e);
