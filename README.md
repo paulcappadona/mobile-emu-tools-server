@@ -123,3 +123,22 @@ Send a deeplink to the emulator
     }
   }).catchError((err) => print("Error sending request to set ios location: ${err}"));
 ```
+
+### App Launch
+/launch-app/:platform
+```dart
+  Map<String, String> headers = {};
+  headers['Content-Type'] = 'application/json';
+
+  String bundleId = "com.example.app";
+
+  return await http.post(Uri.parse("${adbServerBaseUrl()}/launch-app/${Platform.operatingSystem}"), headers: headers,
+      body: jsonEncode(jsonEncode({ "packageId": bundleId, "activity": "${bundleId}.MainActivity" }))
+  ).then((resp) {
+    if(resp.statusCode == 200) {
+      print("Request to launch app for ${Platform.operatingSystem} locale $locale");
+    } else {
+      print("Request to launch app for ${Platform.operatingSystem} locale $locale with code ${resp.statusCode}: ${resp.body}");
+    }
+  }).catchError((err) => print("Error launching app: ${err}"));
+```

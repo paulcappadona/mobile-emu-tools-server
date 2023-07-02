@@ -29,6 +29,8 @@ const adbDeeplinkCommand = "adb shell am start -a android.intent.action.VIEW \
   -c android.intent.category.BROWSABLE \
   -d {link} {packageId}";
 const iosDeeplinkCommand = "xcrun simctl openurl booted {link}";
+const iosAppLaunchCommand = "xcrun simctl launch booted {bundleId}";
+const adbAppLaunchCommand = "adb shell am start -n {bundleId}/{activity}";
 
 interface Screenshot {
   locale: string;
@@ -49,6 +51,11 @@ interface GpsPosition {
 interface Deeplink {
   link: string;
   packageId?: string;
+};
+
+interface AppLaunch {
+  packageId: string;
+  activity?: string;
 };
 
 app.post('/screenshot/:platform', (req: express.Request, res: express.Response) => {
@@ -128,6 +135,26 @@ app.post('/deeplink/:platform', (req: express.Request, res: express.Response) =>
       deeplinkCommand = iosDeeplinkCommand;
     }
     child_process.execSync(deeplinkCommand.replace("{link}", link).replace("{packageId}", packageId));
+    res.send();
+  } catch (e) {
+    console.error(e);
+    res.status(500).send(`Error: ${e}`);
+  }
+});
+
+app.post('/launch-app/:platform', (req: express.Request, res: express.Response) => {
+  try {
+    // convert platform to Platform enum
+    const platform: Platform = req.params.platform as Platform;
+    const launchRequest: AppLaunch = req.body;
+    const packageId = launchRequest.packageId;
+    const androidMainActivity = launchRequest.activity ?? `${packageId}.MainActivity`;
+    console.log(`Launching app ${packageId} for ${platform}`);
+    let launchCommand = adbAppLaunchCommand;
+    if (platform === Platform.IOS) {
+      launchCommand = iosAppLaunchCommand;
+    }
+    child_process.execSync(launchCommand.replace("{bundleId}", packageId).replace("{activity}", androidMainActivity));
     res.send();
   } catch (e) {
     console.error(e);
