@@ -250,9 +250,9 @@ async function submitScreenshotRequest(templateUpdates: TemplateUpdate[]) {
       const apiUrl = endpoint.replace("{template_id}", template.id);
       console.log(`Submitting request for template ${template.id} (${template.platform} / ${template.locale} / ${template.device})`);
       const reqBody = { modifications: modifications };
-      // console.debug("--------------------");
-      // console.debug(`Request body : ${JSON.stringify(reqBody)}`);
-      // console.debug("--------------------");
+      console.debug("--------------------");
+      console.debug(`Request body : ${JSON.stringify(reqBody)}`);
+      console.debug("--------------------");
       return fetch(apiUrl, {
           method: 'post',
           headers: {
