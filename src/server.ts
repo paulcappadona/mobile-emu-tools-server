@@ -22,6 +22,7 @@ const port = process.env.LISTEN_PORT;
 
 const adbScreenshotCommand = "adb exec-out screencap -p > {path}";
 const iosScreenshotCommand = "xcrun simctl io booted screenshot {path}";
+const adbPermsCommand = "adb shell pm grant {bundleId} {perms}";
 const iosPermsCommand = "applesimutils --booted --bundle {bundleId} --setPermissions \"{perms}\"";
 const adbLocationSetCommand = 'adb emu geo fix {lng} {lat}';
 const iosLocationSetCommand = 'applesimutils --booted -sl "[{lat}, {lng}]"';
@@ -87,14 +88,17 @@ app.post('/store/screenshots', storeScreenshot);
 
 app.get('/store/screenshots/status', storeScreenshotStatus);
 
-app.post('/permissions/ios', (req: express.Request, res: express.Response) => {
+app.post('/permissions/:platform', (req: express.Request, res: express.Response) => {
   try {
+    const platform: Platform = req.params.platform as Platform;
     const requestData: PermissionsRequest = req.body;
-    console.log(`Requested ios perms ${requestData.perms} to be set`);
-    child_process.execSync(iosPermsCommand
-      .replace("{perms}", `${requestData.perms}`)
-      .replace("{bundleId}", `${requestData.bundleId}`)
-    );
+    console.log(`Requested ${platform} perms ${requestData.perms} to be set`);
+    let emuCommand = adbPermsCommand;
+    if (platform === Platform.IOS) {
+      emuCommand = iosPermsCommand;
+    }
+    emuCommand = emuCommand.replace("{bundleId}", `${requestData.bundleId}`).replace("{perms}", `${requestData.perms}`);
+    child_process.execSync(emuCommand);
     res.send();
   } catch (e) {
     console.error(e);

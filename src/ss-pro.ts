@@ -210,7 +210,6 @@ export async function uploadFilesToBucket(filePath: string, bucketName: string, 
 }
 
 async function submitScreenshotRequest(templateUpdates: TemplateUpdate[]) {
-  const host = process.env.SSPRO_API_HOST!;
   const endpoint = process.env.SSPRO_API_ENDPOINT!;
   const token = process.env.SSPRO_API_KEY!;
   const downloadUrls: string[] = [];
@@ -230,7 +229,7 @@ async function submitScreenshotRequest(templateUpdates: TemplateUpdate[]) {
     templateBatches.push(batch);
   }
 
-  console.log(`Submitting ${templateBatches.length} batches of requests to ${host}${endpoint}`);
+  console.log(`Submitting ${templateBatches.length} batches of requests to ${endpoint}`);
   let batchNumber = 1;
   const submissionPromises: Promise<any>[] = [];
   for (const batch of templateBatches) {
