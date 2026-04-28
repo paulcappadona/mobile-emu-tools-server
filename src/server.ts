@@ -40,7 +40,7 @@ interface Screenshot {
 };
 
 interface PermissionsRequest {
-  perms: string;
+  perms: string[];
   bundleId: string;
 };
 
@@ -97,8 +97,10 @@ app.post('/permissions/:platform', (req: express.Request, res: express.Response)
     if (platform === Platform.IOS) {
       emuCommand = iosPermsCommand;
     }
-    emuCommand = emuCommand.replace("{bundleId}", `${requestData.bundleId}`).replace("{perms}", `${requestData.perms}`);
-    child_process.execSync(emuCommand);
+    const emuBundleCommand = emuCommand.replace("{bundleId}", `${requestData.bundleId}`);
+    for (const perm of requestData.perms) {
+      child_process.execSync(emuBundleCommand.replace("{perms}", perm));
+    }
     res.send();
   } catch (e) {
     console.error(e);
