@@ -25,7 +25,8 @@ const iosScreenshotCommand = "xcrun simctl io booted screenshot {path}";
 const adbPermsCommand = "adb shell pm grant {bundleId} {perms}";
 const iosPermsCommand = "applesimutils --booted --bundle {bundleId} --setPermissions \"{perms}\"";
 const adbLocationSetCommand = 'adb emu geo fix {lng} {lat}';
-const iosLocationSetCommand = 'applesimutils --booted -sl "[{lat}, {lng}]"';
+// const iosLocationSetCommand = 'applesimutils --booted -sl "[{lat}, {lng}]"';
+const iosLocationSetCommand = 'xcrun simctl location booted set {lat},{lng}';
 const adbDeeplinkCommand = "adb shell am start -a android.intent.action.VIEW \
   -c android.intent.category.BROWSABLE \
   -d {link} {packageId}";
