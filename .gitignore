@@ -16,3 +16,4 @@ build
 .env
 screenshots/**
 
+.DS_Store

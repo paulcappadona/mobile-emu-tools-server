@@ -210,7 +210,6 @@ export async function uploadFilesToBucket(filePath: string, bucketName: string, 
 }
 
 async function submitScreenshotRequest(templateUpdates: TemplateUpdate[]) {
-  const host = process.env.SSPRO_API_HOST!;
   const endpoint = process.env.SSPRO_API_ENDPOINT!;
   const token = process.env.SSPRO_API_KEY!;
   const downloadUrls: string[] = [];
@@ -230,7 +229,7 @@ async function submitScreenshotRequest(templateUpdates: TemplateUpdate[]) {
     templateBatches.push(batch);
   }
 
-  console.log(`Submitting ${templateBatches.length} batches of requests to ${host}${endpoint}`);
+  console.log(`Submitting ${templateBatches.length} batches of requests to ${endpoint}`);
   let batchNumber = 1;
   const submissionPromises: Promise<any>[] = [];
   for (const batch of templateBatches) {
@@ -250,9 +249,9 @@ async function submitScreenshotRequest(templateUpdates: TemplateUpdate[]) {
       const apiUrl = endpoint.replace("{template_id}", template.id);
       console.log(`Submitting request for template ${template.id} (${template.platform} / ${template.locale} / ${template.device})`);
       const reqBody = { modifications: modifications };
-      // console.debug("--------------------");
-      // console.debug(`Request body : ${JSON.stringify(reqBody)}`);
-      // console.debug("--------------------");
+      console.debug("--------------------");
+      console.debug(`Request body : ${JSON.stringify(reqBody)}`);
+      console.debug("--------------------");
       return fetch(apiUrl, {
           method: 'post',
           headers: {
